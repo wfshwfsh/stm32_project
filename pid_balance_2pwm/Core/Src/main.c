@@ -144,11 +144,19 @@ void update_ch3(int val)
 		set_pwm(TIM_CHANNEL_2, val);
 }
 
+void pid_balance()
+{
+	
+
+}
+
 void IBUS_2pwm() {
 		int pwmVal;
 		
 		// update CH3: throttle
 		pwmVal = pwm_filter(cur_channels[2]);
+	  
+	  pid_balance();
 		update_ch3(pwmVal);
 }
 
@@ -195,11 +203,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 	}
 }
 
-void pid_balance()
-{
-	
 
-}
 
 
 /* USER CODE END 0 */
@@ -239,16 +243,19 @@ int main(void)
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
 	start_pwm(TIM_CHANNEL_1);
+	HAL_Delay(1000);
 	start_pwm(TIM_CHANNEL_2);
-	set_pwm(TIM_CHANNEL_ALL, 1000);
+	HAL_Delay(1000);
+	set_pwm(TIM_CHANNEL_1, 1000);
+	HAL_Delay(1000);
+	set_pwm(TIM_CHANNEL_2, 1000);
+	HAL_Delay(1000);
+	
 	IBUS_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	//int pwmVal=1100;
-	//HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
-	
   while (1)
   {
 		count++;
@@ -262,7 +269,7 @@ int main(void)
 		if(count % 200 == 0){
 			IBUS_show_ch();
 		}
-
+		
 		HAL_Delay(10);
   }
 	
