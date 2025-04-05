@@ -1,0 +1,27 @@
+--cpu=Cortex-M4.fp.sp
+"07_fsi6a\startup_stm32f411xe.o"
+"07_fsi6a\main.o"
+"07_fsi6a\gpio.o"
+"07_fsi6a\dma.o"
+"07_fsi6a\usart.o"
+"07_fsi6a\stm32f4xx_it.o"
+"07_fsi6a\stm32f4xx_hal_msp.o"
+"07_fsi6a\stm32f4xx_hal_uart.o"
+"07_fsi6a\stm32f4xx_hal_rcc.o"
+"07_fsi6a\stm32f4xx_hal_rcc_ex.o"
+"07_fsi6a\stm32f4xx_hal_flash.o"
+"07_fsi6a\stm32f4xx_hal_flash_ex.o"
+"07_fsi6a\stm32f4xx_hal_flash_ramfunc.o"
+"07_fsi6a\stm32f4xx_hal_gpio.o"
+"07_fsi6a\stm32f4xx_hal_dma_ex.o"
+"07_fsi6a\stm32f4xx_hal_dma.o"
+"07_fsi6a\stm32f4xx_hal_pwr.o"
+"07_fsi6a\stm32f4xx_hal_pwr_ex.o"
+"07_fsi6a\stm32f4xx_hal_cortex.o"
+"07_fsi6a\stm32f4xx_hal.o"
+"07_fsi6a\stm32f4xx_hal_exti.o"
+"07_fsi6a\system_stm32f4xx.o"
+--strict --scatter "07_fsi6A\07_fsi6A.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "07_fsi6A.map" -o 07_fsi6A\07_fsi6A.axf

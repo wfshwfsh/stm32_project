@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -44,7 +45,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t RxBuf[4]={};
+uint8_t TxBuf[]="ACK package";
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,9 +92,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-	
+	HAL_UART_Receive_IT(&huart2, RxBuf, sizeof(RxBuf));
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -100,11 +103,11 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-		
+
     /* USER CODE BEGIN 3 */
 		char msg[] = "Hello STM32F411!\r\n";
 		HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 100);
-		HAL_Delay(1000);
+		HAL_Delay(2000);
   }
   /* USER CODE END 3 */
 }
@@ -124,8 +127,8 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   **/
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -155,6 +158,17 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+#include <stdio.h>
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+	if(UartHandle->Instance == USART2)
+	{
+		HAL_UART_Transmit_IT(&huart2, TxBuf, sizeof(TxBuf));
+		
+		//re enable uart receive INT
+		HAL_UART_Receive_IT(&huart2, RxBuf, sizeof(RxBuf));
+	}
+}
 
 /* USER CODE END 4 */
 

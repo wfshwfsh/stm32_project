@@ -2,6 +2,7 @@
 "03_uart\startup_stm32f411xe.o"
 "03_uart\main.o"
 "03_uart\gpio.o"
+"03_uart\dma.o"
 "03_uart\usart.o"
 "03_uart\stm32f4xx_it.o"
 "03_uart\stm32f4xx_hal_msp.o"
