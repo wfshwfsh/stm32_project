@@ -17,13 +17,10 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <stdio.h>
 #include "main.h"
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
-//#include "stdio.h"
-//#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -153,7 +150,6 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
-	
   /* USER CODE BEGIN 2 */
 	char msg[] = "Hello STM32F411!\r\n";
 	HAL_UART_Transmit(&huart2, (uint8_t*)msg, sizeof(msg) - 1, 100);
@@ -174,7 +170,7 @@ int main(void)
 		Convert_MPU_Data();
 
 		printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\n", Accel_Xg, Accel_Yg, Accel_Zg);
-		printf("Gyro: X=%.2f°/s Y=%.2f°/s Z=%.2f°/s\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
+		printf("Gyro: X=%.2fï¿½/s Y=%.2fï¿½/s Z=%.2fï¿½/s\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
 		
 		HAL_Delay(500);
 		
