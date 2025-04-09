@@ -89,6 +89,7 @@ int ferror(FILE *f){
 #define MPU6250_ADDR_W (0x68 << 1)
 #define PI 3.14159265359f
 #define PERIOD_MS 100.0f 
+#define A2212_CH2_Offset 100
 
 uint8_t ibus_buffer[IBUS_FRAME_SIZE]={};
 uint16_t ibus_channels[10]={};
@@ -114,9 +115,9 @@ int16_t Accel_X, Accel_Y, Accel_Z;
 int16_t Gyro_X, Gyro_Y, Gyro_Z;
 
 // PID parameter
-float Kp = 3.120;
-float Ki = 0.0005;//0.05;
-float Kd = 0;//2.35;//10.5;
+float Kp = 0.820;
+float Ki = 0.00272;//0.05;
+float Kd = 0;//1;//2.35;//10.5;
 
 
 void MPU6250_ReadData(void)
@@ -180,8 +181,8 @@ void Calibrate_Gyro_Offset()
 
 void show_MPU_Data()
 {
-	printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\n", Accel_Xg, Accel_Yg, Accel_Zg);
-	printf("Gyro: X=%.2f Y=%.2f Z=%.2f\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
+	printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\r\n", Accel_Xg, Accel_Yg, Accel_Zg);
+	printf("Gyro: X=%.2f Y=%.2f Z=%.2f\r\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
 }
 
 //TIM_CHANNEL_ALL
@@ -194,6 +195,8 @@ void stop_pwm(int ch) {
 }
 
 void set_pwm(int ch, int pwmVal) {
+	if(TIM_CHANNEL_2 == ch)
+		pwmVal = pwmVal+A2212_CH2_Offset;
 	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
 }
 	
@@ -209,7 +212,7 @@ void IBUS_update_ch() {
 
 void IBUS_show_ch() {
  
-	printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\n",
+	printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\r\n",
 					cur_channels[0], cur_channels[1], cur_channels[2],
 					cur_channels[3], cur_channels[4], cur_channels[5]);
 }
@@ -227,8 +230,8 @@ int pwm_filter(int val)
 
 void update_ch3(int val, float pid)
 {
-	int pwm_l = pwm_filter(val+pid);
-	int pwm_r = pwm_filter(val-pid);
+	int pwm_l = pwm_filter(val+(pid/2.0));
+	int pwm_r = pwm_filter(val-(pid/2.0));
 	
 	set_pwm(TIM_CHANNEL_1, pwm_l);
 	set_pwm(TIM_CHANNEL_2, pwm_r);
@@ -239,7 +242,7 @@ float error=0.0, lastError=0.0;
 float	targetAngle=0.0, angleOffset=0.0;
 float	prev_angle=0.0, curAngle=0.0;
 float dt, integral=0.0;
-float pidOutput=0.0;
+float pidOutput=0.0, prev_pidOutput=0.0;
 
 
 void angle_calculate()
@@ -256,8 +259,8 @@ void angle_calculate()
 	//curAngle = 0.80 * (curAngle + Gyro_Xdps * dt) + 0.20 * _angle;
 	
 	//printf("Gyro_Xdps:%f \n", Gyro_Xdps);
-	//printf("cur_ts:%u, last_ts:%u, dt:%f\n", currentTime, lastTime, dt);
-	//printf("_angle:%f, curAngle:%f \n", _angle, curAngle);
+	//printf("cur_ts:%u, last_ts:%u, dt:%f\r\n", currentTime, lastTime, dt);
+	//printf("_angle:%f, curAngle:%f \r\n", _angle, curAngle);
   
 	prev_angle = curAngle;
 UPDATE_TS:
@@ -266,7 +269,9 @@ UPDATE_TS:
 
 void pid_calculate()
 {
+	if(0 == dt) return;
   error = curAngle-targetAngle;
+	
 	// pid_i:
 	//if(error > -3.0 && error < 3.0){
 		integral += error*dt;
@@ -274,20 +279,16 @@ void pid_calculate()
 	
 	// pid_d:
   float derivative = (error-lastError)/dt;
-	
-	
-  pidOutput = Kp * error + Ki * integral + Kd * derivative;
-	
-	//
-	if(pidOutput < -1000){
-		pidOutput = pidOutput-1000;
-	}else if(pidOutput > 1000){
-		pidOutput = 1000;
-	}
+	float PID = Kp * error + Ki * integral + Kd * derivative;
   
-  //printf("%f\n", pidOutput);
-	printf("P:%f\t I:%f\t D:%f\n", Kp * error, Ki * integral, Kd * derivative);
-  lastError = error;
+	pidOutput = 0.80*prev_pidOutput + 0.20*PID;
+	//printf("prev_pidOutput:%f pidOutput:%f PID:%f\r\n", prev_pidOutput, pidOutput, PID);
+	prev_pidOutput = pidOutput;
+	lastError = error;
+  
+  //printf("%f\r\n", pidOutput);
+	//printf("P:%f\t I:%f\t D:%f\r\n", Kp * error, Ki * integral, Kd * derivative);
+	printf("curAngle:%f PID:%f\r\n", curAngle, PID);
 }
 
 void IBUS_2pwm() {
@@ -320,7 +321,7 @@ void IBUS_Parse() {
             ibus_channels[i] = ibus_buffer[4 + (i * 2)] | (ibus_buffer[3 + (i * 2)] << 8);
         }
 
-        //printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\n",
+        //printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\r\n",
         //    ibus_channels[0], ibus_channels[1], ibus_channels[2],
         //    ibus_channels[3], ibus_channels[4], ibus_channels[5]);
     //}
@@ -338,7 +339,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 			IBUS_update_ch();
 		}
 		
-		//printf("666\n");
 		memset(&ibus_buffer, 0, sizeof(ibus_buffer));
 		IBUS_Init();
 		count++;
@@ -384,22 +384,22 @@ int main(void)
   MX_USART6_UART_Init();
 	MX_TIM3_Init();
 	
-	printf("### init: i2c MPU\n");
+	printf("### init: i2c MPU\r\n");
   MX_I2C1_Init();
 	
   /* USER CODE BEGIN 2 */
 	MPU6250_Init();
 	Calibrate_Gyro_Offset();
 	
-	printf("### init: pwm\n");
-	set_pwm(TIM_CHANNEL_2, 1000);
-	set_pwm(TIM_CHANNEL_1, 1000);
-	
-	start_pwm(TIM_CHANNEL_2);
+	printf("### init: pwm\r\n");
 	start_pwm(TIM_CHANNEL_1);
+	start_pwm(TIM_CHANNEL_2);
 	
-	HAL_Delay(3000);
-	printf("### init: IBUS\n");
+	set_pwm(TIM_CHANNEL_1, 1000);
+	set_pwm(TIM_CHANNEL_2, 1000);
+	
+	HAL_Delay(2000);
+	printf("### init: IBUS\r\n");
 	
 	IBUS_Init();
   /* USER CODE END 2 */

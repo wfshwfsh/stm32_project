@@ -88,7 +88,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  uint16_t pwmVal=1150;   //PWM???  
+  uint16_t pwmVal=1275;   //PWM???  
 	uint8_t dir=1;    
   /* USER CODE END 1 */
 
@@ -113,8 +113,13 @@ int main(void)
   MX_TIM3_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+	printf("START PWM \r\n");
 	HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2);
+	
+	__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, 1000);
+	__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_2, 1100);
+	HAL_Delay(5000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -124,29 +129,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		printf("SET PWM = %d\n", pwmVal);
+		printf("SET PWM = %d\r\n", pwmVal);
+		//__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
 		__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
-		__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_2, pwmVal);
+		__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_2, pwmVal+100);
+		
 		HAL_Delay(5000);
 		pwmVal = pwmVal +5;
-		if(pwmVal > 1250)
+		if(pwmVal > 1300)
 			break;
-		//while (pwmVal< 500)
-	  //{
-		//  pwmVal++;
-		//  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
-		//  //TIM3->CCR1 = pwmVal;
-		//  HAL_Delay(1);
-	  //}
-	  //while (pwmVal)
-	  //{
-		//  pwmVal--;
-		//  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
-		//  //TIM3->CCR1 = pwmVal;
-		//  HAL_Delay(1);
-	  //}
-	  //HAL_Delay(200);
+		
+		HAL_Delay(500);
   }
+	printf("STOP PWM \r\n");
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
   /* USER CODE END 3 */
