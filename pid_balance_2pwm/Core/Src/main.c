@@ -115,9 +115,9 @@ int16_t Accel_X, Accel_Y, Accel_Z;
 int16_t Gyro_X, Gyro_Y, Gyro_Z;
 
 // PID parameter
-float Kp = 0.820;
-float Ki = 0.00272;//0.05;
-float Kd = 0;//1;//2.35;//10.5;
+float Kp = 0.780;
+float Ki = 0.00270;//0.05;
+float Kd = 8;//1;//2.35;//10.5;
 
 
 void MPU6250_ReadData(void)
@@ -161,7 +161,7 @@ void Convert_MPU_Data(void)
 //initial MPU6250
 void Calibrate_Gyro_Offset()
 {
-    int samples = 500;
+    int samples = 1000;
     float sum_x = 0, sum_y = 0, sum_z = 0;
 
     for (int i = 0; i < samples; i++) {
@@ -255,10 +255,9 @@ void angle_calculate()
   float _angle = -atan2(Accel_Yg, Accel_Zg) * 180 / PI - angleOffset;
 	
   //-------  ---------------
-  curAngle = 0.15 * (curAngle + Gyro_Xdps * dt) + 0.85 * _angle;
-	//curAngle = 0.80 * (curAngle + Gyro_Xdps * dt) + 0.20 * _angle;
+	curAngle = 0.82 * (curAngle + Gyro_Xdps * dt / 1000) + 0.18 * _angle;
 	
-	//printf("Gyro_Xdps:%f \n", Gyro_Xdps);
+	//printf("Gyro_Xdps:%f \r\n", Gyro_Xdps);
 	//printf("cur_ts:%u, last_ts:%u, dt:%f\r\n", currentTime, lastTime, dt);
 	//printf("_angle:%f, curAngle:%f \r\n", _angle, curAngle);
   
@@ -287,8 +286,8 @@ void pid_calculate()
 	lastError = error;
   
   //printf("%f\r\n", pidOutput);
-	//printf("P:%f\t I:%f\t D:%f\r\n", Kp * error, Ki * integral, Kd * derivative);
-	printf("curAngle:%f PID:%f\r\n", curAngle, PID);
+	printf("curAngle:%f P:%f\t I:%f\t D:%f\r\n", curAngle, Kp * error, Ki * integral, Kd * derivative);
+	//printf("curAngle:%f PID:%f\r\n", curAngle, PID);
 }
 
 void IBUS_2pwm() {
