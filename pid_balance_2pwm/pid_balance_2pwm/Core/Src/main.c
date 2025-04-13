@@ -82,6 +82,8 @@ int ferror(FILE *f){
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//if FS_I6A define to 1, means control by receive FS_I6A
+#define FS_I6A 0
 
 #define IBUS_FRAME_SIZE 32
 #define MPU6050_ADDR 0x68 << 1
@@ -115,9 +117,12 @@ int16_t Accel_X, Accel_Y, Accel_Z;
 int16_t Gyro_X, Gyro_Y, Gyro_Z;
 
 // PID parameter
-float Kp = 0.780;
-float Ki = 0.00270;//0.05;
-float Kd = 8;//1;//2.35;//10.5;
+float Kp = 1.860;
+float Ki = 0.00180;//0.05;
+float Kd = 0;//4.15;
+
+#define FUSION_RATE_ANGLE 0.85
+#define FUSION_RATE_PID 0.75
 
 
 void MPU6250_ReadData(void)
@@ -252,12 +257,12 @@ void angle_calculate()
   dt = (currentTime - lastTime)/PERIOD_MS;
 	
   //------- acc --------------------------
-  float _angle = -atan2(Accel_Yg, Accel_Zg) * 180 / PI - angleOffset;
+  float _angle = -atan2(Accel_Xg, Accel_Zg) * 180 / PI - angleOffset;
 	
   //-------  ---------------
-	curAngle = 0.82 * (curAngle + Gyro_Xdps * dt / 1000) + 0.18 * _angle;
+	curAngle = FUSION_RATE_ANGLE * (curAngle + Gyro_Ydps * dt / 1000) + (1-FUSION_RATE_ANGLE) * _angle;
 	
-	//printf("Gyro_Xdps:%f \r\n", Gyro_Xdps);
+	//printf("Gyro_Xdps:%f \r\n", Gyro_Ydps);
 	//printf("cur_ts:%u, last_ts:%u, dt:%f\r\n", currentTime, lastTime, dt);
 	//printf("_angle:%f, curAngle:%f \r\n", _angle, curAngle);
   
@@ -280,7 +285,8 @@ void pid_calculate()
   float derivative = (error-lastError)/dt;
 	float PID = Kp * error + Ki * integral + Kd * derivative;
   
-	pidOutput = 0.80*prev_pidOutput + 0.20*PID;
+	pidOutput = FUSION_RATE_PID*prev_pidOutput + (1-FUSION_RATE_PID)*PID;
+	//pidOutput = PID;
 	//printf("prev_pidOutput:%f pidOutput:%f PID:%f\r\n", prev_pidOutput, pidOutput, PID);
 	prev_pidOutput = pidOutput;
 	lastError = error;
@@ -294,8 +300,11 @@ void IBUS_2pwm() {
 	int throttle;
 	
 	// update CH3: throttle
+#if FS_I6A
 	throttle = pwm_filter(cur_channels[2]);
-	
+#else
+	throttle = 1350;
+#endif
 	angle_calculate();
 	pid_calculate();
 	
@@ -400,7 +409,7 @@ int main(void)
 	HAL_Delay(2000);
 	printf("### init: IBUS\r\n");
 	
-	IBUS_Init();
+	//IBUS_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */

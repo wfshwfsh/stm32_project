@@ -169,8 +169,8 @@ int main(void)
 		MPU6250_ReadData();
 		Convert_MPU_Data();
 
-		printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\n", Accel_Xg, Accel_Yg, Accel_Zg);
-		printf("Gyro: X=%.2f�/s Y=%.2f�/s Z=%.2f�/s\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
+		printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\r\n", Accel_Xg, Accel_Yg, Accel_Zg);
+		printf("Gyro: X=%.2f/s Y=%.2f/s Z=%.2f/s\r\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
 		
 		HAL_Delay(500);
 		

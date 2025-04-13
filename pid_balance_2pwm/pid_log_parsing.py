@@ -1,9 +1,17 @@
+import sys
 import re
 import matplotlib.pyplot as plt
 import pandas as pd
 
+if len(sys.argv) < 2:
+    print("❗請提供 log 檔案路徑，例如：python analyze_log.py your_log_file.txt")
+    sys.exit(1)
+
+# 取得檔案名稱
+filename = sys.argv[1]
+
 # 模擬LOG資料
-with open("log2.txt") as f:
+with open(filename) as f:
     log_data = f.read()
 
 # 使用正則表達式擷取每行的數值
