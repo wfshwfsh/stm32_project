@@ -77,7 +77,13 @@ int ferror(FILE *f){
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define A2212_CH2_Base 100
 
+void set_pwm(int ch, int pwmVal) {
+	if(TIM_CHANNEL_2 == ch)
+		pwmVal = pwmVal+A2212_CH2_Base;
+	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
+}
 /* USER CODE END 0 */
 
 /**
@@ -117,26 +123,28 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_2);
 	
-	__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, 1000);
-	__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_2, 1100);
+	set_pwm(TIM_CHANNEL_1, 1000);
+	set_pwm(TIM_CHANNEL_2, 1000);
 	HAL_Delay(5000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	int count=26;
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		printf("SET PWM = %d\r\n", pwmVal);
-		//__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
-		__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, pwmVal);
-		__HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_2, pwmVal+100);
+		printf("count = %d\r\n", count);
+		//set_pwm(TIM_CHANNEL_1, (1320-count));
+		//set_pwm(TIM_CHANNEL_2, (1320+count));
+		set_pwm(TIM_CHANNEL_1, 1380-count);
+		set_pwm(TIM_CHANNEL_2, 1380+count);
 		
-		HAL_Delay(5000);
-		pwmVal = pwmVal +5;
-		if(pwmVal > 1300)
+		HAL_Delay(8000);
+		count = count+1;
+		if(count > 50)
 			break;
 		
 		HAL_Delay(500);

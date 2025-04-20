@@ -91,7 +91,11 @@ int ferror(FILE *f){
 #define MPU6250_ADDR_W (0x68 << 1)
 #define PI 3.14159265359f
 #define PERIOD_MS 100.0f 
-#define A2212_CH2_Offset 100
+#define A2212_CH2_Base 100
+#define A2212_CH2_Offset (+49)
+#define A2212_CH2_RATE 1.0445
+#define PID_CH1_ADJUST (+29)
+#define PID_CH2_ADJUST (-13)
 
 uint8_t ibus_buffer[IBUS_FRAME_SIZE]={};
 uint16_t ibus_channels[10]={};
@@ -117,12 +121,14 @@ int16_t Accel_X, Accel_Y, Accel_Z;
 int16_t Gyro_X, Gyro_Y, Gyro_Z;
 
 // PID parameter
-float Kp = 1.860;
-float Ki = 0.00180;//0.05;
-float Kd = 0;//4.15;
+float Kp = 0.176;//0.102;//0.0320;
+float Ki = 0.000210;//0.05;
+float Kd = 0;//0.35;//4.15;
 
-#define FUSION_RATE_ANGLE 0.85
-#define FUSION_RATE_PID 0.75
+//angle: 0.48 - 0.52
+#define FUSION_RATE_ANGLE 0.48
+//#define FUSION_RATE_PID 0.65
+#define FUSION_RATE_PID 0.20
 
 
 void MPU6250_ReadData(void)
@@ -145,6 +151,13 @@ float Gyro_Xdps, Gyro_Ydps, Gyro_Zdps;
 float gyro_x_offset = 0;
 float gyro_y_offset = 0;
 float gyro_z_offset = 0;
+
+uint32_t currentTime=0, lastTime=0;
+float error=0.0, lastError=0.0;
+float	targetAngle=0.0, angleOffset=0.0;
+float	prev_angle=0.0, curAngle=0.0;
+float dt, integral=0.0;
+float pidOutput=0.0, prev_pidOutput=0.0, prev_pidAdjust=0.0;
 
 void Convert_MPU_Data(void)
 {
@@ -201,7 +214,7 @@ void stop_pwm(int ch) {
 
 void set_pwm(int ch, int pwmVal) {
 	if(TIM_CHANNEL_2 == ch)
-		pwmVal = pwmVal+A2212_CH2_Offset;
+		pwmVal = pwmVal+A2212_CH2_Base;
 	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
 }
 	
@@ -233,22 +246,50 @@ int pwm_filter(int val)
 	}
 }
 
-void update_ch3(int val, float pid)
-{
-	int pwm_l = pwm_filter(val+(pid/2.0));
-	int pwm_r = pwm_filter(val-(pid/2.0));
-	
-	set_pwm(TIM_CHANNEL_1, pwm_l);
-	set_pwm(TIM_CHANNEL_2, pwm_r);
+float map_float(float x, float in_min, float in_max, float out_min, float out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-uint32_t currentTime=0, lastTime=0;
-float error=0.0, lastError=0.0;
-float	targetAngle=0.0, angleOffset=0.0;
-float	prev_angle=0.0, curAngle=0.0;
-float dt, integral=0.0;
-float pidOutput=0.0, prev_pidOutput=0.0;
+int compensatePIDOutput(float pid_output, float angle) {
+    int compensation = 0;
 
+    // +++ : 0 ~ +20 => 0 ~ +27
+    if (angle > 0.0f) {
+        if (angle > 20.0f) angle = 19.3f;
+        compensation = map_float((angle * 100.0f), 0, 1930, 0, PID_CH1_ADJUST);
+    }
+    // --- : 0 ~ -15 => 0 ~ -11
+    else if (angle < 0.0f) {
+        if (angle < -15.0f) angle = -15.0f;
+        compensation = map_float((-angle * 100.0f), 0, 1500, 0, PID_CH2_ADJUST);
+    }
+		
+		//printf("compensation:%d\n", compensation);
+    // PID
+    int compensated_output = pid_output + compensation;
+    return compensated_output;
+}
+
+void update_ch3(int val, float pid)
+{
+	//int pwm_l = pwm_filter(val+(pid/2.0));
+	//int pwm_r = pwm_filter(val-(pid/2.0));
+	int pwm_l;
+	int pwm_r;
+	int pid_adjust, _pid_adjust;
+	_pid_adjust = compensatePIDOutput(pid, curAngle);
+	_pid_adjust = _pid_adjust - (A2212_CH2_Offset/2);
+	pid_adjust = (1-FUSION_RATE_PID)*prev_pidAdjust + FUSION_RATE_PID*_pid_adjust;
+	//printf("_pid_adjust:%d adj:%d\n", _pid_adjust, pid_adjust);
+	prev_pidAdjust=pid_adjust;
+	pwm_l = pwm_filter(val+pid_adjust);
+	pwm_r = pwm_filter(val-pid_adjust);
+	
+	set_pwm(TIM_CHANNEL_1, pwm_l);
+	//set_pwm(TIM_CHANNEL_2, pwm_r);
+	set_pwm(TIM_CHANNEL_2, pwm_r);
+	//set_pwm(TIM_CHANNEL_2, (A2212_CH2_RATE*pwm_r));
+}
 
 void angle_calculate()
 {
@@ -285,14 +326,14 @@ void pid_calculate()
   float derivative = (error-lastError)/dt;
 	float PID = Kp * error + Ki * integral + Kd * derivative;
   
-	pidOutput = FUSION_RATE_PID*prev_pidOutput + (1-FUSION_RATE_PID)*PID;
-	//pidOutput = PID;
+	//pidOutput = FUSION_RATE_PID*prev_pidOutput + (1-FUSION_RATE_PID)*PID;
+	pidOutput = PID;
 	//printf("prev_pidOutput:%f pidOutput:%f PID:%f\r\n", prev_pidOutput, pidOutput, PID);
-	prev_pidOutput = pidOutput;
+	//prev_pidOutput = pidOutput;
 	lastError = error;
   
   //printf("%f\r\n", pidOutput);
-	printf("curAngle:%f P:%f\t I:%f\t D:%f\r\n", curAngle, Kp * error, Ki * integral, Kd * derivative);
+	printf("curAngle:%f\t P:%f\t I:%f\t D:%f\r\n", curAngle, Kp * error, Ki * integral, Kd * derivative);
 	//printf("curAngle:%f PID:%f\r\n", curAngle, PID);
 }
 
@@ -428,8 +469,8 @@ int main(void)
 		}
 		
 		if(count % 200 == 0){
-			show_MPU_Data();
-			IBUS_show_ch();
+			//show_MPU_Data();
+			//IBUS_show_ch();
 		}
 		
 		HAL_Delay(10);
