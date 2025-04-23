@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "math.h"
 #include "main.h"
 #include "dma.h"
 #include "i2c.h"
@@ -54,197 +53,25 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-#include <stdio.h>
 #include <string.h>
+#include "uart_printf.h"
+#include "mpu6050.h"
+#include "pwm.h"
+#include "pid.h"
+#include "fs-i6x.h"
 
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-PUTCHAR_PROTOTYPE
-{
-  /* Place your implementation of fputc here */
-  /* e.g. write a character to the USART1 and Loop until the end of transmission */
-  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
-
-  return ch;
-}
-
-FILE __stdout;
-
-int fputc(int ch, FILE *f){
-	HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
-  return ch;
-}
-
-int ferror(FILE *f){
-  /* Your implementation of ferror(). */
-  return 0;
-}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 //if FS_I6A define to 1, means control by receive FS_I6A
 #define FS_I6A 0
 
-#define IBUS_FRAME_SIZE 32
-#define MPU6050_ADDR 0x68 << 1
-#define MPU6250_ADDR_R (0x68 << 1 | 1)
-#define MPU6250_ADDR_W (0x68 << 1)
-#define PI 3.14159265359f
-#define PERIOD_MS 100.0f 
-#define A2212_CH2_Base 100
-#define A2212_CH2_Offset (+49)
-#define A2212_CH2_RATE 1.0445
-#define PID_CH1_ADJUST (+29)
-#define PID_CH2_ADJUST (-13)
-
-uint8_t ibus_buffer[IBUS_FRAME_SIZE]={};
-uint16_t ibus_channels[10]={};
-uint16_t cur_channels[10]={};
-int idx=0, ibus_idx =0;
 int count=0;
 
-enum {
-	eCH1 = 0, 
-	eCH2, 
-	eCH3_THROTTLE, 
-	eCH4,
-};
-
-
-void MPU6250_Init(void)
-{
-	uint8_t data = 0x00;
-	HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDR, 0x6B, I2C_MEMADD_SIZE_8BIT, &data, 1, HAL_MAX_DELAY);
-}
-
-int16_t Accel_X, Accel_Y, Accel_Z;
-int16_t Gyro_X, Gyro_Y, Gyro_Z;
-
-// PID parameter
-float Kp = 0.176;//0.102;//0.0320;
-float Ki = 0.000210;//0.05;
-float Kd = 0;//0.35;//4.15;
-
-//angle: 0.48 - 0.52
-#define FUSION_RATE_ANGLE 0.48
-//#define FUSION_RATE_PID 0.65
-#define FUSION_RATE_PID 0.20
-
-
-void MPU6250_ReadData(void)
-{
-	uint8_t mpu_data[14];
-	HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDR, 0x3B, I2C_MEMADD_SIZE_8BIT, mpu_data, 14, HAL_MAX_DELAY);
-
-	Accel_X = (int16_t)(mpu_data[0] << 8 | mpu_data[1]);
-	Accel_Y = (int16_t)(mpu_data[2] << 8 | mpu_data[3]);
-	Accel_Z = (int16_t)(mpu_data[4] << 8 | mpu_data[5]);
-
-	Gyro_X  = (int16_t)(mpu_data[8] << 8 | mpu_data[9]);
-	Gyro_Y  = (int16_t)(mpu_data[10] << 8 | mpu_data[11]);
-	Gyro_Z  = (int16_t)(mpu_data[12] << 8 | mpu_data[13]);
-}
-
-float Accel_Xg, Accel_Yg, Accel_Zg;
-float Gyro_Xdps, Gyro_Ydps, Gyro_Zdps;
-
-float gyro_x_offset = 0;
-float gyro_y_offset = 0;
-float gyro_z_offset = 0;
-
-uint32_t currentTime=0, lastTime=0;
-float error=0.0, lastError=0.0;
-float	targetAngle=0.0, angleOffset=0.0;
-float	prev_angle=0.0, curAngle=0.0;
-float dt, integral=0.0;
-float pidOutput=0.0, prev_pidOutput=0.0, prev_pidAdjust=0.0;
-
-void Convert_MPU_Data(void)
-{
-	Accel_Xg = Accel_X / 16384.0;
-	Accel_Yg = Accel_Y / 16384.0;
-	Accel_Zg = Accel_Z / 16384.0;
-
-	if( (gyro_x_offset == 0) && (gyro_y_offset == 0) && (gyro_z_offset == 0) ){
-		Gyro_Xdps = Gyro_X / 131.0;
-		Gyro_Ydps = Gyro_Y / 131.0;
-		Gyro_Zdps = Gyro_Z / 131.0;
-	}else{
-		Gyro_Xdps = (Gyro_X / 131.0) - gyro_x_offset;
-		Gyro_Ydps = (Gyro_Y / 131.0) - gyro_y_offset;
-		Gyro_Zdps = (Gyro_Z / 131.0) - gyro_z_offset;
-	}
-}
-
-//initial MPU6250
-void Calibrate_Gyro_Offset()
-{
-    int samples = 1000;
-    float sum_x = 0, sum_y = 0, sum_z = 0;
-
-    for (int i = 0; i < samples; i++) {
-        MPU6250_ReadData(); // raw value or dps, ?????
-				Convert_MPU_Data();
-
-        sum_x += Gyro_Xdps;
-        sum_y += Gyro_Ydps;
-        sum_z += Gyro_Zdps;
-        HAL_Delay(2); // ??????????
-    }
-
-    gyro_x_offset = sum_x / samples;
-    gyro_y_offset = sum_y / samples;
-    gyro_z_offset = sum_z / samples;
-}
-
-void show_MPU_Data()
-{
-	printf("Accel: X=%.2fg Y=%.2fg Z=%.2fg\r\n", Accel_Xg, Accel_Yg, Accel_Zg);
-	printf("Gyro: X=%.2f Y=%.2f Z=%.2f\r\n"   , Gyro_Xdps, Gyro_Ydps, Gyro_Zdps);
-}
-
 //TIM_CHANNEL_ALL
-void start_pwm(int ch) {
-	HAL_TIM_PWM_Start(&htim3,ch);
-}
 
-void stop_pwm(int ch) {
-	HAL_TIM_PWM_Stop(&htim3, ch);
-}
-
-void set_pwm(int ch, int pwmVal) {
-	if(TIM_CHANNEL_2 == ch)
-		pwmVal = pwmVal+A2212_CH2_Base;
-	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
-}
-	
-void IBUS_Init() {
-	HAL_UARTEx_ReceiveToIdle_IT(&huart6, ibus_buffer, IBUS_FRAME_SIZE);
-}
-
-void IBUS_update_ch() {
-	for(int i=0;i<10;i++){
-		cur_channels[i] = ibus_channels[i];
-	}
-}
-
-void IBUS_show_ch() {
- 
-	printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\r\n",
-					cur_channels[0], cur_channels[1], cur_channels[2],
-					cur_channels[3], cur_channels[4], cur_channels[5]);
-}
-
-int pwm_filter(int val)
-{
-	if(val <= 1000){
-		return 1000;
-	}else if(val > 2000){
-		return 2000;
-	}else{
-		return val;
-	}
-}
 
 float map_float(float x, float in_min, float in_max, float out_min, float out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -291,51 +118,8 @@ void update_ch3(int val, float pid)
 	//set_pwm(TIM_CHANNEL_2, (A2212_CH2_RATE*pwm_r));
 }
 
-void angle_calculate()
-{
-  currentTime = HAL_GetTick();
-	if(0 == lastTime) goto UPDATE_TS;
-  dt = (currentTime - lastTime)/PERIOD_MS;
-	
-  //------- acc --------------------------
-  float _angle = -atan2(Accel_Xg, Accel_Zg) * 180 / PI - angleOffset;
-	
-  //-------  ---------------
-	curAngle = FUSION_RATE_ANGLE * (curAngle + Gyro_Ydps * dt / 1000) + (1-FUSION_RATE_ANGLE) * _angle;
-	
-	//printf("Gyro_Xdps:%f \r\n", Gyro_Ydps);
-	//printf("cur_ts:%u, last_ts:%u, dt:%f\r\n", currentTime, lastTime, dt);
-	//printf("_angle:%f, curAngle:%f \r\n", _angle, curAngle);
-  
-	prev_angle = curAngle;
-UPDATE_TS:
-  lastTime = currentTime;
-}
 
-void pid_calculate()
-{
-	if(0 == dt) return;
-  error = curAngle-targetAngle;
-	
-	// pid_i:
-	//if(error > -3.0 && error < 3.0){
-		integral += error*dt;
-	//}
-	
-	// pid_d:
-  float derivative = (error-lastError)/dt;
-	float PID = Kp * error + Ki * integral + Kd * derivative;
-  
-	//pidOutput = FUSION_RATE_PID*prev_pidOutput + (1-FUSION_RATE_PID)*PID;
-	pidOutput = PID;
-	//printf("prev_pidOutput:%f pidOutput:%f PID:%f\r\n", prev_pidOutput, pidOutput, PID);
-	//prev_pidOutput = pidOutput;
-	lastError = error;
-  
-  //printf("%f\r\n", pidOutput);
-	printf("curAngle:%f\t P:%f\t I:%f\t D:%f\r\n", curAngle, Kp * error, Ki * integral, Kd * derivative);
-	//printf("curAngle:%f PID:%f\r\n", curAngle, PID);
-}
+
 
 void IBUS_2pwm() {
 	int throttle;
@@ -394,7 +178,17 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 	}
 }
 
-
+int tim1_cnt=0;
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim == &htim1)
+  {
+		if(tim1_cnt % 200 == 0)
+			printf("AAAAAAAAAA\r\n");
+		
+		tim1_cnt++;
+  }
+}
 
 
 /* USER CODE END 0 */
@@ -429,13 +223,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+  MX_TIM3_Init();
   MX_USART2_UART_Init();
   MX_USART6_UART_Init();
-	MX_TIM3_Init();
-	
-	printf("### init: i2c MPU\r\n");
   MX_I2C1_Init();
-	
+  MX_TIM1_Init();
+	HAL_TIM_Base_Start_IT(&htim1);
   /* USER CODE BEGIN 2 */
 	MPU6250_Init();
 	Calibrate_Gyro_Offset();
