@@ -67,105 +67,77 @@ void SystemClock_Config(void);
 
 //if FS_I6A define to 1, means control by receive FS_I6A
 #define FS_I6A 0
-
+int throttle = 1150;
 int count=0;
+int isReady=0;
+float dt_tim1_intr=0;
 
 //TIM_CHANNEL_ALL
+#define FUSION_RATE_PID 1.0
+//#define FUSION_RATE_PID 0.20
 
-
-float map_float(float x, float in_min, float in_max, float out_min, float out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+void show_parameters()
+{
+	printf("###################################\r\n");
+	printf("Kp:%f, Ki:%f, Kd:%f\r\n\r\n", Kp, Ki, Kd);
 }
 
-int compensatePIDOutput(float pid_output, float angle) {
-    int compensation = 0;
-
-    // +++ : 0 ~ +20 => 0 ~ +27
-    if (angle > 0.0f) {
-        if (angle > 20.0f) angle = 19.3f;
-        compensation = map_float((angle * 100.0f), 0, 1930, 0, PID_CH1_ADJUST);
-    }
-    // --- : 0 ~ -15 => 0 ~ -11
-    else if (angle < 0.0f) {
-        if (angle < -15.0f) angle = -15.0f;
-        compensation = map_float((-angle * 100.0f), 0, 1500, 0, PID_CH2_ADJUST);
-    }
-		
-		//printf("compensation:%d\n", compensation);
-    // PID
-    int compensated_output = pid_output + compensation;
-    return compensated_output;
-}
-
+int ch_cnt=0;
 void update_ch3(int val, float pid)
 {
-	//int pwm_l = pwm_filter(val+(pid/2.0));
-	//int pwm_r = pwm_filter(val-(pid/2.0));
-	int pwm_l;
-	int pwm_r;
-	int pid_adjust, _pid_adjust;
-	_pid_adjust = compensatePIDOutput(pid, curAngle);
-	_pid_adjust = _pid_adjust - (A2212_CH2_Offset/2);
+	int pwm_1;
+	int pwm_2;
+	float pid_adjust=0, _pid_adjust=0;
+	//_pid_adjust = compensatePIDOutput(pid, curAngle);
+	_pid_adjust = pid;
 	pid_adjust = (1-FUSION_RATE_PID)*prev_pidAdjust + FUSION_RATE_PID*_pid_adjust;
-	//printf("_pid_adjust:%d adj:%d\n", _pid_adjust, pid_adjust);
-	prev_pidAdjust=pid_adjust;
-	pwm_l = pwm_filter(val+pid_adjust);
-	pwm_r = pwm_filter(val-pid_adjust);
+	//printf("_adjust:%f adjust:%f\r\n", _pid_adjust, pid_adjust);
 	
-	set_pwm(TIM_CHANNEL_1, pwm_l);
-	//set_pwm(TIM_CHANNEL_2, pwm_r);
-	set_pwm(TIM_CHANNEL_2, pwm_r);
-	//set_pwm(TIM_CHANNEL_2, (A2212_CH2_RATE*pwm_r));
+	pwm_1 = (int)pwm_filter(val+pid_adjust-(A2212_CH2_Offset/2));
+	pwm_2 = (int)pwm_filter(val-pid_adjust+(A2212_CH2_Offset/2));
+	
+	if(ch_cnt++ % 100 == 0)
+		printf("pwm_1:%d , pwm2:%d\r\n", pwm_1, pwm_2);
+	
+	set_pwm(TIM_CHANNEL_1, pwm_1);
+	set_pwm(TIM_CHANNEL_2, pwm_2);
+	//set_pwm(TIM_CHANNEL_2, (A2212_CH2_RATE*pwm_2));
 }
 
-
-
-
-void IBUS_2pwm() {
-	int throttle;
-	
-	// update CH3: throttle
-#if FS_I6A
-	throttle = pwm_filter(cur_channels[2]);
-#else
-	throttle = 1350;
-#endif
-	angle_calculate();
-	pid_calculate();
-	
-	update_ch3(throttle, pidOutput);//pidOutput
+float ftimer_2ms(float ftimer)
+{
+	return (1000/ftimer);
 }
 
-void IBUS_Parse() {
-    if (ibus_buffer[0] != 0x20 || ibus_buffer[1] != 0x40) {
-        return;
-    }
-		
-    uint8_t checksum = 0;
-    for (int i = 0; i < 31; i++) {
-        checksum += ibus_buffer[i];
-			  //printf("%d: %02x ", i, ibus_buffer[i]);
-    }
-		//printf("\n");
-		
-		//printf("CRC = %d, b[31] = %d \n", checksum, ibus_buffer[31]);
-    //if (checksum == ibus_buffer[31]) {
-        for (int i = 0; i < 10; i++) {  // ??? 10 ???
-            ibus_channels[i] = ibus_buffer[4 + (i * 2)] | (ibus_buffer[3 + (i * 2)] << 8);
-        }
+//SysClk=72MHz, Prescaler=49, ARR=7199
+float calc_clk(int sysclk, int prescaler, int arr)
+{
+	float f_timer = sysclk/((prescaler+1)*(arr+1));
+	return ftimer_2ms(f_timer);
+}
 
-        //printf("CH1:%d  CH2:%d  CH3:%d  CH4:%d  CH5:%d  CH6:%d\r\n",
-        //    ibus_channels[0], ibus_channels[1], ibus_channels[2],
-        //    ibus_channels[3], ibus_channels[4], ibus_channels[5]);
-    //}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim == &htim1)
+  {
+		if(isReady)
+		{
+			// update CH3: throttle
+		#if FS_I6A
+			throttle = pwm_filter(cur_channels[2]);
+		#endif
+			angle_calculate();
+			pid_calculate();
+			update_ch3(throttle, pidOutput);//pidOutput
+		}
+  }
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 {
 	if (huart->Instance == USART2){
-		idx = size;
+		
 	}else if (huart->Instance == USART6){
-		ibus_idx = size;
 		
 		if(count % 100 == 0){
 			IBUS_Parse();
@@ -178,19 +150,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
 	}
 }
 
-int tim1_cnt=0;
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  if (htim == &htim1)
-  {
-		if(tim1_cnt % 200 == 0)
-			printf("AAAAAAAAAA\r\n");
-		
-		tim1_cnt++;
-  }
-}
-
-
 /* USER CODE END 0 */
 
 /**
@@ -201,7 +160,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	show_parameters();
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -229,10 +188,9 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM1_Init();
 	HAL_TIM_Base_Start_IT(&htim1);
-  /* USER CODE BEGIN 2 */
-	MPU6250_Init();
-	Calibrate_Gyro_Offset();
+	dt_tim1_intr = calc_clk(72000000, 7199, 49);
 	
+  /* USER CODE BEGIN 2 */
 	printf("### init: pwm\r\n");
 	start_pwm(TIM_CHANNEL_1);
 	start_pwm(TIM_CHANNEL_2);
@@ -240,10 +198,15 @@ int main(void)
 	set_pwm(TIM_CHANNEL_1, 1000);
 	set_pwm(TIM_CHANNEL_2, 1000);
 	
-	HAL_Delay(2000);
-	printf("### init: IBUS\r\n");
+	HAL_Delay(5000);
+	printf("### init: MPU\r\n");
+	MPU6250_Init();
+	Calibrate_Gyro_Offset();
 	
+	printf("### init: IBUS\r\n");
 	//IBUS_Init();
+	
+	isReady = 1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -256,10 +219,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
 		MPU6250_ReadData();
 		Convert_MPU_Data();
-		
-		if(count % 10 == 0){
-			IBUS_2pwm();
-		}
 		
 		if(count % 200 == 0){
 			//show_MPU_Data();

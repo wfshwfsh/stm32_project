@@ -29,10 +29,10 @@
 "pid_balance_2pwm\system_stm32f4xx.o"
 "pid_balance_2pwm\fs-i6x.o"
 "pid_balance_2pwm\delay.o"
-"pid_balance_2pwm\mpu6050.o"
 "pid_balance_2pwm\pid.o"
 "pid_balance_2pwm\pwm.o"
 "pid_balance_2pwm\uart_printf.o"
+"pid_balance_2pwm\mpu6050.o"
 --strict --scatter "pid_balance_2pwm\pid_balance_2pwm.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers

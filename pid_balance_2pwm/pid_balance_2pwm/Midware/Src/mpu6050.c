@@ -1,4 +1,5 @@
 #include "mpu6050.h"
+extern float dt_tim1_intr;
 
 int16_t Accel_X, Accel_Y, Accel_Z;
 int16_t Gyro_X, Gyro_Y, Gyro_Z;
@@ -169,32 +170,22 @@ void show_MPU_Data()
 #define PERIOD_MS 100.0f
 
 //angle: 0.48 - 0.52
-#define FUSION_RATE_ANGLE 0.48
+#define FUSION_RATE_ANGLE 0.99
 
-uint32_t currentTime=0, lastTime=0;
 float	prev_angle=0.0, curAngle=0.0;
 float angleOffset=0.0;
-float dt;
-
 
 
 void angle_calculate()
 {
-  currentTime = HAL_GetTick();
-	if(0 == lastTime) goto UPDATE_TS;
-  dt = (currentTime - lastTime)/PERIOD_MS;
-	
   //------- acc --------------------------
-  float _angle = -atan2(Accel_Xg, Accel_Zg) * 180 / PI - angleOffset;
+  float accAngle = -atan2(Accel_Xg, Accel_Zg) * 180 / PI - angleOffset;
 	
   //-------  ---------------
-	curAngle = FUSION_RATE_ANGLE * (curAngle + Gyro_Ydps * dt / 1000) + (1-FUSION_RATE_ANGLE) * _angle;
+	curAngle = FUSION_RATE_ANGLE * (curAngle + Gyro_Ydps * dt_tim1_intr / 1000) + (1-FUSION_RATE_ANGLE) * accAngle;
 	
 	//printf("Gyro_Xdps:%f \r\n", Gyro_Ydps);
-	//printf("cur_ts:%u, last_ts:%u, dt:%f\r\n", currentTime, lastTime, dt);
-	//printf("_angle:%f, curAngle:%f \r\n", _angle, curAngle);
+	//printf("_angle:%f, curAngle:%f \r\n", accAngle, curAngle);
   
 	prev_angle = curAngle;
-UPDATE_TS:
-  lastTime = currentTime;
 }

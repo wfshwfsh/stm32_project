@@ -3,11 +3,10 @@
 #include <math.h>
 
 
-#define PID_CH1_ADJUST (+29)
-#define PID_CH2_ADJUST (-13)
+#define PID_CH1_ADJUST (+8)
+#define PID_CH2_ADJUST (-8)
 
-//#define FUSION_RATE_PID 0.65
-#define FUSION_RATE_PID 0.20
+
 
 extern float Kp;
 extern float Ki;
@@ -20,3 +19,5 @@ extern float pidOutput, prev_pidOutput, prev_pidAdjust;
 
 
 void pid_calculate();
+float map_float(float x, float in_min, float in_max, float out_min, float out_max);
+int compensatePIDOutput(float pid_output, float angle);

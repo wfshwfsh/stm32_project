@@ -77,11 +77,8 @@ int ferror(FILE *f){
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define A2212_CH2_Base 100
 
 void set_pwm(int ch, int pwmVal) {
-	if(TIM_CHANNEL_2 == ch)
-		pwmVal = pwmVal+A2212_CH2_Base;
 	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
 }
 /* USER CODE END 0 */
@@ -94,7 +91,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  uint16_t pwmVal=1275;   //PWM???  
+  uint16_t pwmVal=1175;   //PWM???  
 	uint8_t dir=1;    
   /* USER CODE END 1 */
 

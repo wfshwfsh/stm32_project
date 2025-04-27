@@ -96,10 +96,8 @@ extern float gyro_x_offset;
 extern float gyro_y_offset;
 extern float gyro_z_offset;
 
-extern uint32_t currentTime, lastTime;
 extern float	prev_angle, curAngle;
 extern float angleOffset;
-extern float dt;
 
 
 void MPU6250_Init(void);

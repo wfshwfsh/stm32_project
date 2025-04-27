@@ -10,17 +10,17 @@ void stop_pwm(int ch) {
 }
 
 void set_pwm(int ch, int pwmVal) {
-	if(TIM_CHANNEL_2 == ch)
-		pwmVal = pwmVal+A2212_CH2_Base;
+	//if(TIM_CHANNEL_2 == ch)
+	//	pwmVal = pwmVal+A2212_CH2_Base;
 	__HAL_TIM_SetCompare(&htim3, ch, pwmVal);
 }
 
-int pwm_filter(int val)
+float pwm_filter(float val)
 {
 	if(val <= 1000){
 		return 1000;
-	}else if(val > 2000){
-		return 2000;
+	}else if(val >= 1600){
+		return 1600;
 	}else{
 		return val;
 	}

@@ -19,7 +19,8 @@ extern uint16_t ibus_channels[10];
 extern uint16_t cur_channels[10];
 extern int idx, ibus_idx;
 
+void IBUS_show_ch();
 void IBUS_Init();
 void IBUS_update_ch();
-void IBUS_show_ch();
+void IBUS_Parse();
 
