@@ -3,15 +3,16 @@
 extern float dt_tim1_intr;
 
 // PID parameter
-float Kp = 2.250*0.6;
-float Ki = 0;//0.005;
-float Kd = 2.88*0.6;//2.3* 0.6;
+float Kp = 4.125*0.6;//2.250*0.6;
+float Ki = 0.125;
+float Kd = 21.58*0.6;//2.88*0.6;
 
 
 float error=0.0, lastError=0.0;
 float	targetAngle=0.0;
-float integral=0.0;
+float integral=0.0, derivative=0.0;
 float pidOutput=0.0, prev_pidOutput=0.0, prev_pidAdjust=0.0;
+extern float Gyro_Xdps, Gyro_Ydps;
 
 static int count=0;
 void pid_calculate()
@@ -24,7 +25,8 @@ void pid_calculate()
 	//}
 	
 	// pid_d:
-  float derivative = (error-lastError)/(dt_tim1_intr/1000);
+  //derivative = (error-lastError)/(dt_tim1_intr/1000);
+	derivative = Gyro_Ydps;
 	if(derivative > 10){
 		derivative = 10;
 	}else if(derivative < -10){
@@ -34,13 +36,14 @@ void pid_calculate()
   
 	//pidOutput = FUSION_RATE_PID*prev_pidOutput + (1-FUSION_RATE_PID)*PID;
 	pidOutput = PID;
-	//printf("prev_pidOutput:%f pidOutput:%f PID:%f\r\n", prev_pidOutput, pidOutput, PID);
+	//printf("prev_pidOutput:%f pidOutput:%f PIDm:%f\r\n", prev_pidOutput, pidOutput, PID);
 	//prev_pidOutput = pidOutput;
 	lastError = error;
   
   //printf("%f\r\n", pidOutput);
-	if(count++ % 20 == 0)
+	if(count++ % 20 == 0){
 		printf("curAngle:%f\t P:%f\t I:%f\t D:%f\r\n", curAngle, Kp * error, Ki * integral, Kd * derivative);
+	}
 	//printf("curAngle:%f PID:%f\r\n", curAngle, PID);
 }
 
